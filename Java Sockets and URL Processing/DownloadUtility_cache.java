@@ -1,12 +1,17 @@
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.io.*;
-import java.net.*;
 
 /**
  * A utility that downloads a file from a URL.
  * @author www.codejava.net
  *
  */
-public class HttpDownload_Socket {
+public class DownloadUtility_Cache {
     private static final int BUFFER_SIZE = 4096;
  
     /**
@@ -15,6 +20,46 @@ public class HttpDownload_Socket {
      * @param saveDir path of the directory to save the file
      * @throws IOException
      */
+    private static final int CACHE_SIZE = 2;
+    public static Boolean fileExists(String filePath){
+        File file = new File(filePath);
+        if(file.exists() && !file.isDirectory()){
+            return true;
+        }
+        return false;
+    }
+
+    public static void cacheOperations(){
+        System.out.println("Checking Cache:");
+        File cacheFolder = new File("./cache");
+        File[] listOfFiles = cacheFolder.listFiles();
+
+        Long lru=Long.MAX_VALUE;
+
+        File toRemove = null;
+
+        for (int i = 0; i < listOfFiles.length; i++) {
+            if (listOfFiles[i].isFile()) {
+            if (listOfFiles[i].lastModified()<lru) {
+                lru = listOfFiles[i].lastModified();
+                toRemove = listOfFiles[i];
+            }
+            System.out.println("File " + listOfFiles[i].getName() + "Modified at : " + listOfFiles[i].lastModified());
+            } else if (listOfFiles[i].isDirectory()) {
+            System.out.println("Directory " + listOfFiles[i].getName());
+            }
+        }
+        System.out.println("Total Files = "+listOfFiles.length);
+
+        System.out.println("File to remove = "+toRemove.getName());
+
+        if(listOfFiles.length >= CACHE_SIZE){
+            System.out.println("Deleting the File: "+toRemove.getName());
+            toRemove.delete();
+        }
+
+    }
+
     public static void downloadFile(String fileURL, String saveDir) throws IOException {
         
         URL url = new URL(fileURL);
@@ -50,33 +95,35 @@ public class HttpDownload_Socket {
             }
  
             System.out.println("Content-Type = " + contentType);
+            //System.out.println("Content-Disposition = " + disposition);
+            //System.out.println("Content-Length = " + contentLength);
             System.out.println("fileName = " + fileName);
-            
-            //create a socket connection
-            Socket client = new Socket(url.getHost(), url.getDefaultPort());
-            System.out.println("Just connected to " + client.getRemoteSocketAddress());
-            
-
+ 
             // opens input stream from the HTTP connection
-            InputStream inputStream = client.getInputStream();
+            InputStream inputStream = httpConn.getInputStream();
             String saveFilePath = saveDir + File.separator + fileName;
-             
-            // opens an output stream to save into file
-            FileOutputStream outputStream = new FileOutputStream(saveFilePath);
- 
-            int bytesRead = -1;
-            byte[] buffer = new byte[BUFFER_SIZE];
-            while ((bytesRead = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesRead);
-            }
- 
-            outputStream.close();
-            inputStream.close();
- 
-            System.out.println("File downloaded");
             
+            if(!fileExists(saveFilePath)){
+                cacheOperations();
+                // opens an output stream to save into file
+                FileOutputStream outputStream = new FileOutputStream(saveFilePath);
+                
+                int bytesRead = -1;
+                byte[] buffer = new byte[BUFFER_SIZE];
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+     
+                outputStream.close();
+                inputStream.close();
+     
+                System.out.println("File downloaded");
+                System.out.println("Saved file At :"+saveFilePath);
+            }
+            else
+                System.out.println("File Exists already");
             //Now exec command to open the downloaded fiel using external viewer
-            openfile(fileName);
+            openfile(saveFilePath);
         } else {
             System.out.println("No file to download. Server replied HTTP code: " + responseCode);
         }
@@ -102,11 +149,11 @@ public class HttpDownload_Socket {
         //String fileURL = "http://www.tutorialspoint.com/java/java_tutorial.pdf";
         if(args.length>0){
             String fileURL=args[0];
-            String saveDir = ".";
+            String saveDir = "./cache";
             
 
             try {
-                downloadFile(fileURL, saveDir);
+                DownloadUtility_Cache.downloadFile(fileURL, saveDir);
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
